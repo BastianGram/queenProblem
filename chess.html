@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>queens</title>
+
+        <style>
+            table {
+                border-collapse: collapse;
+                margin: auto;
+            }
+            th, td {
+                border: 1px solid black;
+                padding: 25px;
+                text-align: center;
+            }
+            .button-container {
+            text-align: center;
+            margin-bottom: 20px; /* Add some space between buttons and table */
+        }
+        </style>
+            
+    </head>
+    <body>
+        <div class="button-container">
+            <button onClick=solve(false)> Find next solution </button>
+            <button onClick=pauseResume()> Pause </button>
+            <button onClick=nextMove()> Next move </button>
+            <button onClick=solveAlls()> Solve all </button>
+        </div>
+        
+        <div style = "text-align: center;">
+            <label for="delay-slider">Delay: </label>
+            <input type="range" id="delay-slider" min="0" max="500" value="100" step="10" oninput="updateDelay(this.value)">
+            <span id="delay-value">100 ms</span>
+        </div>
+
+        <div id="table-container"></div>
+
+        <div id="solution-counter" style="text-align: center;">
+            Solution <span id="solution-number">0</span> out of 92
+        </div>
+
+        <script>
+            let amount = 0;
+            let container;
+            let table;
+            let isPaused = false;
+            let delayTime = 100;
+            let queenColor = 'black';
+            let threatenColor = 'red';
+            let clearColor = 'white';
+            let solutionCount = 1;
+            let solveAll = false;
+
+            document.addEventListener('DOMContentLoaded', () => {
+                container = document.getElementById('table-container');
+                table = createTable(8, 8);
+                container.appendChild(table);
+                // Initial setup
+            });
+
+
+            async function solve(){
+                if (solutionCount == 92){
+                    alert("Resetting")
+                    hardReset();
+                }
+                if (amount == 8){
+                    solutionCount++;
+                    document.getElementById('solution-number').innerText = solutionCount;
+                    removeQueen(amount-1);
+                }
+                while (amount < 8) {
+                    if (isPaused) {
+                    await delay(100); // Check every 100ms if still paused
+                    continue;
+                }
+                    findPosition(amount);
+                    container.appendChild(table);
+                    if (solveAll == false){
+                        await delay(delayTime); // Delay of miliseconds
+                    } else {
+                        await delay(5);
+                    }
+                    
+                }
+                if(solveAll == true && solutionCount < 92){
+                    await delay(delayTime*10);
+                    solve();
+                }
+            }
+            
+
+            function pauseResume() {
+                isPaused = !isPaused;
+                document.getElementById('pause-resume-btn').innerText = isPaused ? 'Resume' : 'Pause';
+            }
+
+            function updateDelay(value) {
+                delayTime = value;
+                document.getElementById('delay-value').innerText = `${value} ms`;
+            }
+
+            function solveAlls() {
+                if (solveAll == true) {solveAll = false;}
+                else {
+                    solveAll = true;
+                    solve();
+                }
+            }
+        
+
+        function nextMove(){
+            if (amount < 8){
+                findPosition(amount);
+            } else {
+                solutionCount++;
+                removeQueen(amount-1);
+                document.getElementById('solution-number').innerText = solutionCount;
+            }
+        }
+
+            // Function to create an 8x8 table
+            function createTable(rows, cols) {
+                let table = document.createElement('table');
+                for (let i = 0; i < rows; i++) {
+                    let tr = document.createElement('tr');
+                    for (let j = 0; j < cols; j++) {
+                        let td = document.createElement('td');
+                        td.dataset.value = 0;
+                        td.dataset.tried = false;
+                        td.dataset.queen = false;
+                        tr.appendChild(td);
+                    }
+                table.appendChild(tr);
+                }
+                return table;
+            }
+            
+            //places queen and makes necessary updates
+            function placeQueen(row, column){
+                //places queen
+                table.rows[row].cells[column].dataset.queen = true;
+                //changes affected tiles
+                changeAffected(row, column, true);
+                //updates the amount of queens placed
+                amount++;
+            }
+
+            function findPosition (row){
+                for (let i = 0; i < 8; i++) {
+                    let cell = table.rows[row].cells[i];
+                    let isTried = (cell.dataset.tried === "true"); // Convert string to boolean
+                    if (cell.dataset.value == 0 && !(isTried)){
+                        placeQueen(row,i);
+                        return;
+                    }
+                }
+                //gets here if there is no avaliable position in given column
+                removeQueen(amount-1);
+            }
+
+            //removes the last placed queen and makes necessary updates
+            function removeQueen(row) {
+                for (let i = 0; i < 8; i++) {
+                    let cell = table.rows[row].cells[i];
+                    if(cell.dataset.queen == "true"){
+                        //removes queen
+                        cell.dataset.queen = false;
+                        //remember to no try to place queen here again
+                        cell.dataset.tried = true;
+                        //changes affected tiles
+                        changeAffected(row, i, false);
+                        //updates the amount of queens placed
+                        amount--;
+                        clearTiles(Number(row) + 1);
+                        return;
+                    }
+                }
+            }
+
+            //sets all tiles ahead to tried value to false
+            function clearTiles(row){
+                for (let i = row; i < 8; i++) {
+                    for (let j = 0; j < 8; j++) {
+                        let cell = table.rows[i].cells[j];
+                        cell.dataset.tried = false;
+                    }
+                }
+            }
+
+            function changeAffected(row, column, place){
+                let factor;
+                let cell = table.rows[row].cells[column];
+                if (place){
+                    factor = 1;
+                    changeCellColor(cell,queenColor);
+                } else {
+                    factor = -1;
+                    changeCellColor(cell,clearColor)
+                }
+                //vertical
+                for (let i = 0; i < 8; i++) {
+                    cell = table.rows[row].cells[i]
+                    let currentValue = Number(cell.dataset.value);
+                    cell.dataset.value = currentValue + factor;
+                    if (cell.dataset.queen != "true"){
+                        changeCellColor(cell, threatenColor)
+                    }
+                    if (cell.dataset.value == 0){
+                        changeCellColor(cell, clearColor);
+                    }
+                    
+                }
+                //horizontal
+                for (let i = 0; i < 8; i++) {
+                    let cell = table.rows[i].cells[column];
+                    let currentValue = Number(cell.dataset.value);
+                    cell.dataset.value = currentValue + factor;
+                    if (cell.dataset.queen != "true"){
+                        changeCellColor(cell, threatenColor)
+                    }
+                    if (cell.dataset.value == 0){
+                        changeCellColor(cell, clearColor);
+                    }
+                    
+                }
+                // //diagonal++
+                let rowpos = row;
+                let columnpos = column;
+                while (rowpos < 8 && columnpos < 8) {
+                    let cell = table.rows[rowpos].cells[columnpos];
+                    let currentValue = Number(cell.dataset.value);
+                    cell.dataset.value = currentValue + factor;
+                    rowpos++;
+                    columnpos++;
+                    if (cell.dataset.queen != "true"){
+                        changeCellColor(cell, threatenColor)
+                    }
+                    if (cell.dataset.value == 0){
+                        changeCellColor(cell, clearColor);
+                    }
+                }
+                // //diagonal+-
+                rowpos = row;
+                columnpos = column;
+                while (rowpos < 8 && columnpos >= 0) {
+                    let cell = table.rows[rowpos].cells[columnpos];
+                    let currentValue = Number(cell.dataset.value);
+                    cell.dataset.value = currentValue + factor;
+                    rowpos++;
+                    columnpos--;
+                    if (cell.dataset.queen != "true"){
+                        changeCellColor(cell, threatenColor)
+                    }
+                    if (cell.dataset.value == 0){
+                        changeCellColor(cell, clearColor);
+                    }
+                }
+                // //diagonal--
+                rowpos = row;
+                columnpos = column;
+                while (rowpos >= 0 && columnpos >= 0) {
+                    let cell = table.rows[rowpos].cells[columnpos];
+                    let currentValue = Number(cell.dataset.value);
+                    cell.dataset.value = currentValue + factor;
+                    rowpos--;
+                    columnpos--;
+                    if (cell.dataset.queen != "true"){
+                        changeCellColor(cell, threatenColor)
+                    }
+                    if (cell.dataset.value == 0){
+                        changeCellColor(cell, clearColor);
+                    }
+                }
+                // //diagnoal-+
+                rowpos = row;
+                columnpos = column;
+                while (rowpos >= 0 && columnpos < 8) {
+                    let cell = table.rows[rowpos].cells[columnpos];
+                    let currentValue = Number(cell.dataset.value);
+                    cell.dataset.value = currentValue + factor;
+                    rowpos--;
+                    columnpos++;
+                    if (cell.dataset.queen != "true"){
+                        changeCellColor(cell, threatenColor)
+                    }
+                    if (cell.dataset.value == 0){
+                        changeCellColor(cell, clearColor);
+                    }
+                }
+            }
+
+            function hardReset(){
+                solutionCount = 1;
+                document.getElementById('solution-number').innerText = solutionCount;
+                amount = 0;
+                for (let i = 0; i < 8; i++){
+                        clearTiles(i);
+                        for (let j = 0; j < 8; j++){
+                            console.log(i);
+                            let cell = table.rows[i].cells[j];
+                            changeCellColor(cell,clearColor);
+                            cell.dataset.value = 0;
+                            cell.dataset.queen = false;
+                        }
+                    }
+            }
+
+            function changeCellColor(cell, color) {
+                if (table) {
+                    if (cell) {
+                        cell.style.backgroundColor = color;
+                    }
+                }
+            }
+
+            function delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            </script>
+        </body>
+</html>
